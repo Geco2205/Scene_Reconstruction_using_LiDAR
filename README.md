@@ -22,7 +22,6 @@ found here to a GPU (NVIDIA Jetson Nano, CUDA) and an FPGA (AMD Kria KV260, HLS)
 | Range filter with ARM NEON (`src/RangeFilter.cpp`) | Written for this project | — |
 | Scan ordering, PLY writer, timer (`src/Io.cpp`) | Written for this project | — |
 | Synthetic scan generator (`tools/make_synthetic_scans.py`) | Written for this project | — |
-| Dataset window extractor (`tools/extract_ncd_window.py`) | Written for this project | — |
 
 
 
@@ -154,7 +153,7 @@ meshlab <out>.ply
 
 
 
-## Usage of IA
+## Usage of AI
 
 Note on the use of AI tools
 
