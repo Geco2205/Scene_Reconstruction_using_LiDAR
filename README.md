@@ -160,8 +160,6 @@ Note on the use of AI tools
 
 AI tools are used as support to understand concepts, generate ideas, and improve the writing of the documentation. Implementation, validation, and results are the student's responsibility, who assumes responsibility for any use beyond, or not described in, the above.
 
-The multiply_locality function and this report were developed based on the student's own knowledge.
-
 The shared conversation links are attached as evidence.
 
 Gerson: https://claude.ai/share/be045057-e15d-462e-9e98-40855a3e21fa
