@@ -144,7 +144,14 @@ sudo apt install meshlab
 Open the mesh:
 
 ```bash
-meshlab <out>.ply
+meshlab sample.ply
+```
+
+If the 3D view is blank (common on Wayland, the default on Fedora and recent
+Ubuntu), launch it with:
+
+```bash
+QT_QPA_PLATFORM=xcb meshlab sample.ply
 ```
 
 
