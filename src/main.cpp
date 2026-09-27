@@ -8,22 +8,36 @@
 
 #include <Eigen/Core>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <exception>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <tuple>
 #include <vector>
 
 #include <kiss_icp/pipeline/KissICP.hpp>
 #include <vdbfusion/VDBVolume.h>
 
+#include "recon/BoundedQueue.hpp"
 #include "recon/Io.hpp"
 #include "recon/PcdReader.hpp"
 #include "recon/Profiler.hpp"
 #include "recon/RangeFilter.hpp"
+
+#define RECON_STR_(x) #x
+#define RECON_STR(x) RECON_STR_(x)
+#ifndef RECON_OPT_NATIVE_ON
+#define RECON_OPT_NATIVE_ON 0
+#endif
+#ifndef RECON_OPT_LTO_ON
+#define RECON_OPT_LTO_ON 0
+#endif
 
 namespace {
 
@@ -38,6 +52,7 @@ struct Options {
     std::string timing_csv;        // vacio = no escribir
     std::string mesh_csv;          // vacio = no escribir
     std::size_t mesh_repeats = 1;  // veces que se repite la extraccion de malla
+    std::string pipeline = "off";  // off | prefetch | full  (ver docs/OPTIMIZATIONS.md)
 };
 
 void PrintUsage(const char* argv0) {
@@ -52,7 +67,12 @@ void PrintUsage(const char* argv0) {
         << "  --max-range <m>      Rango maximo del filtro           (60.0)\n"
         << "  --timing-csv <arch>  Guarda tiempos y memoria por scan en CSV\n"
         << "  --mesh-repeats <n>   Repite la extraccion de malla n veces (1)\n"
-        << "  --mesh-csv <arch>    Guarda el tiempo de cada extraccion en CSV\n";
+        << "  --mesh-csv <arch>    Guarda el tiempo de cada extraccion en CSV\n"
+        << "  --pipeline <modo>    Paralelismo por tareas: off | prefetch | full (off)\n"
+        << "                         prefetch: lee y filtra el scan k+1 mientras\n"
+        << "                                   se registra e integra el k\n"
+        << "                         full:     ademas integra el k mientras se\n"
+        << "                                   registra el k+1 (3 hilos)\n";
 }
 
 bool ParseArgs(int argc, char** argv, Options& opt) {
@@ -72,10 +92,14 @@ bool ParseArgs(int argc, char** argv, Options& opt) {
         else if (arg == "--timing-csv")    opt.timing_csv   = next();
         else if (arg == "--mesh-csv")      opt.mesh_csv     = next();
         else if (arg == "--mesh-repeats")  opt.mesh_repeats = std::max<std::size_t>(1, std::stoull(next()));
+        else if (arg == "--pipeline")      opt.pipeline     = next();
         else if (arg == "-h" || arg == "--help") { PrintUsage(argv[0]); return false; }
         else throw std::runtime_error("Argumento desconocido: " + arg);
     }
     if (opt.scan_dir.empty()) { PrintUsage(argv[0]); return false; }
+    if (opt.pipeline != "off" && opt.pipeline != "prefetch" && opt.pipeline != "full") {
+        throw std::runtime_error("--pipeline debe ser off, prefetch o full");
+    }
     return true;
 }
 
@@ -92,7 +116,23 @@ struct ScanSample {
     std::size_t points_kept = 0;
     recon::StageTime stage[kNumStages];
     std::size_t rss_kb = 0;       // memoria residente al terminar el scan
+    double done_ms = 0.0;         // instante en que termino la integracion,
+                                  // medido desde el inicio del ciclo de scans
 };
+
+// Un scan en transito por el pipeline. En modo secuencial se usa igual, asi
+// las tres variantes ejecutan exactamente el mismo codigo por etapa.
+struct ScanWork {
+    ScanSample s;
+    std::vector<Eigen::Vector3d> points;         // marco del sensor, filtrados
+    std::vector<Eigen::Vector3d> global_points;  // marco global
+    Eigen::Vector3d origin = Eigen::Vector3d::Zero();
+};
+
+const char* BuildFlagsDescription() {
+    return "NATIVE=" RECON_STR(RECON_OPT_NATIVE_ON) " LTO=" RECON_STR(RECON_OPT_LTO_ON)
+           " SOA_ALIGNED=" RECON_STR(RECON_SOA_ALIGNED);
+}
 
 struct Summary {
     double mean = 0, stddev = 0, p50 = 0, p95 = 0, min = 0, max = 0;
@@ -164,78 +204,187 @@ int main(int argc, char** argv) try {
               << "Voxel TSDF / ICP  : " << opt.tsdf_voxel << " m / " << opt.icp_voxel << " m\n"
               << "Rango             : [" << opt.min_range << ", " << opt.max_range << "] m\n"
               << "Filtro            : " << (recon::NeonEnabled() ? "NEON" : "escalar") << "\n"
-              << "Compilador        : " << __VERSION__ << "\n\n";
+              << "Compilador        : " << __VERSION__ << "\n"
+              << "Optimizaciones    : " << BuildFlagsDescription() << "\n"
+              << "Pipeline          : " << opt.pipeline << "\n\n";
 
     std::vector<ScanSample> samples;
     samples.reserve(n_scans);
 
-    recon::StageTimer timer;
-    recon::PointCloudSoA filtered;
+    const bool pipelined = opt.pipeline != "off";
+    // En modo pipeline cada hilo mide su propio CPU (ver Profiler.hpp).
+    const auto cpu_clock = pipelined ? recon::StageTimer::CpuClock::kThread
+                                     : recon::StageTimer::CpuClock::kProcess;
+    const auto t_start = std::chrono::steady_clock::now();
+    std::mutex print_mutex;
 
-    for (std::size_t i = 0; i < n_scans; ++i) {
-        ScanSample s;
-        s.scan_index = i;
+    // --- Etapa A: lectura, filtro y conversion -------------------------
+    // Devuelve false si el scan quedo vacio tras el filtro.
+    auto load_scan = [&](std::size_t i, recon::StageTimer& timer,
+                         recon::PointCloudSoA& filtered, ScanWork& w) {
+        w.s.scan_index = i;
 
         timer.Start();
         const recon::PointCloudSoA raw = recon::ReadPcd(scans[i]);
-        s.stage[kRead] = timer.Stop();
-        s.points_in = raw.size();
+        w.s.stage[kRead] = timer.Stop();
+        w.s.points_in = raw.size();
 
         timer.Start();
         recon::FilterByRange(raw, static_cast<float>(opt.min_range),
                              static_cast<float>(opt.max_range), filtered);
-        s.stage[kFilter] = timer.Stop();
-        s.points_kept = filtered.size();
+        w.s.stage[kFilter] = timer.Stop();
+        w.s.points_kept = filtered.size();
 
         if (filtered.empty()) {
+            std::lock_guard<std::mutex> lock(print_mutex);
             std::cerr << "  [" << i << "] scan vacio tras el filtro, se omite\n";
-            continue;
+            return false;
         }
 
         timer.Start();
-        const std::vector<Eigen::Vector3d> points = recon::ToEigen(filtered);
-        s.stage[kConvert] = timer.Stop();
+        w.points = recon::ToEigen(filtered);
+        w.s.stage[kConvert] = timer.Stop();
+        return true;
+    };
 
-        // --- Registro ---------------------------------------------------
+    // --- Etapa B: registro y transformacion ----------------------------
+    // Solo toca 'odometry'. Nunca corre en dos hilos a la vez.
+    auto register_scan = [&](recon::StageTimer& timer, ScanWork& w) {
         // RegisterFrame actualiza el mapa interno y la pose. Se ignora el par
         // que devuelve (source, frame_downsample) porque para la integracion
         // usamos la nube filtrada completa, no la submuestreada por el ICP.
         timer.Start();
-        odometry.RegisterFrame(points);
+        odometry.RegisterFrame(w.points);
         const Sophus::SE3d pose = odometry.pose();
-        s.stage[kRegister] = timer.Stop();
+        w.s.stage[kRegister] = timer.Stop();
 
-        // --- Transformacion al marco global ----------------------------
-        // Antes caia dentro del timer de la integracion.
+        // Transformacion al marco global.
         timer.Start();
-        std::vector<Eigen::Vector3d> global_points;
-        global_points.reserve(points.size());
-        for (const auto& p : points) global_points.emplace_back(pose * p);
-        const Eigen::Vector3d origin = pose.translation();
-        s.stage[kTransform] = timer.Stop();
+        w.global_points.clear();
+        w.global_points.reserve(w.points.size());
+        for (const auto& p : w.points) w.global_points.emplace_back(pose * p);
+        w.origin = pose.translation();
+        w.s.stage[kTransform] = timer.Stop();
+    };
 
-        // --- Integracion TSDF -------------------------------------------
+    // --- Etapa C: integracion TSDF -------------------------------------
+    // Solo toca 'tsdf_volume' y 'samples'. Nunca corre en dos hilos a la vez.
+    auto integrate_scan = [&](recon::StageTimer& timer, ScanWork& w) {
         // VDBFusion espera los puntos ya en el marco global y el origen del
         // sensor, que usa para trazar los rayos y marcar el espacio libre.
         timer.Start();
-        tsdf_volume.Integrate(global_points, origin, [](float /*sdf*/) { return 1.0f; });
-        s.stage[kIntegrate] = timer.Stop();
+        tsdf_volume.Integrate(w.global_points, w.origin, [](float /*sdf*/) { return 1.0f; });
+        w.s.stage[kIntegrate] = timer.Stop();
 
-        s.rss_kb = recon::CurrentRssKb();
-        samples.push_back(s);
+        w.s.rss_kb = recon::CurrentRssKb();
+        w.s.done_ms = std::chrono::duration<double, std::milli>(
+                          std::chrono::steady_clock::now() - t_start).count();
+        samples.push_back(w.s);
 
+        const std::size_t i = w.s.scan_index;
         if (i % 10 == 0 || i + 1 == n_scans) {
             double total = 0;
-            for (const auto& st : s.stage) total += st.wall_ms;
+            for (const auto& st : w.s.stage) total += st.wall_ms;
+            std::lock_guard<std::mutex> lock(print_mutex);
             std::cout << "  [" << std::setw(4) << i << "] "
-                      << std::setw(7) << s.points_in << " -> "
-                      << std::setw(7) << s.points_kept << " pts   "
+                      << std::setw(7) << w.s.points_in << " -> "
+                      << std::setw(7) << w.s.points_kept << " pts   "
                       << std::fixed << std::setprecision(1) << std::setw(7) << total << " ms   "
-                      << std::setw(6) << s.rss_kb / 1024 << " MiB\n";
+                      << std::setw(6) << w.s.rss_kb / 1024 << " MiB\n";
+        }
+    };
+
+    if (opt.pipeline == "off") {
+        // Secuencial: A -> B -> C por cada scan (linea base).
+        recon::StageTimer timer(cpu_clock);
+        recon::PointCloudSoA filtered;
+        for (std::size_t i = 0; i < n_scans; ++i) {
+            ScanWork w;
+            if (!load_scan(i, timer, filtered, w)) continue;
+            register_scan(timer, w);
+            integrate_scan(timer, w);
+        }
+    } else {
+        // Paralelismo por tareas (Cap. 2, tareas heterogeneas): cada etapa en
+        // su propio hilo, conectadas por colas de capacidad 2 (ping-pong).
+        //
+        //   prefetch:  [hilo lector: A] --q_loaded--> [hilo principal: B + C]
+        //   full:      [hilo lector: A] --q_loaded--> [principal: B]
+        //                                --q_registered--> [hilo integrador: C]
+        //
+        // El orden de los scans se conserva porque cada cola es FIFO y cada
+        // etapa tiene un solo hilo. KISS-ICP recibe los scans en el mismo orden
+        // que en modo secuencial, asi que la trayectoria y la malla no cambian.
+        constexpr std::size_t kQueueCapacity = 2;
+        recon::BoundedQueue<ScanWork> q_loaded(kQueueCapacity);
+        recon::BoundedQueue<ScanWork> q_registered(kQueueCapacity);
+        const bool full = opt.pipeline == "full";
+
+        std::exception_ptr reader_error, integrator_error;
+
+        std::thread reader([&] {
+            try {
+                recon::StageTimer timer(cpu_clock);
+                recon::PointCloudSoA filtered;
+                for (std::size_t i = 0; i < n_scans; ++i) {
+                    ScanWork w;
+                    if (load_scan(i, timer, filtered, w)) q_loaded.Push(std::move(w));
+                }
+            } catch (...) {
+                reader_error = std::current_exception();
+            }
+            q_loaded.Close();
+        });
+
+        std::thread integrator;
+        if (full) {
+            integrator = std::thread([&] {
+                try {
+                    recon::StageTimer timer(cpu_clock);
+                    ScanWork w;
+                    while (q_registered.Pop(w)) integrate_scan(timer, w);
+                } catch (...) {
+                    integrator_error = std::current_exception();
+                    // Vaciar la cola para que el hilo principal no se bloquee.
+                    ScanWork drop;
+                    while (q_registered.Pop(drop)) {}
+                }
+            });
+        }
+
+        std::exception_ptr main_error;
+        try {
+            recon::StageTimer timer(cpu_clock);
+            ScanWork w;
+            while (q_loaded.Pop(w)) {
+                register_scan(timer, w);
+                if (full) {
+                    q_registered.Push(std::move(w));
+                } else {
+                    integrate_scan(timer, w);
+                }
+            }
+        } catch (...) {
+            main_error = std::current_exception();
+            ScanWork drop;
+            while (q_loaded.Pop(drop)) {}  // desbloquear al lector
+        }
+        q_registered.Close();
+
+        reader.join();
+        if (integrator.joinable()) integrator.join();
+        for (const auto& e : {reader_error, main_error, integrator_error}) {
+            if (e) std::rethrow_exception(e);
         }
     }
 
+    const double loop_ms = std::chrono::duration<double, std::milli>(
+                               std::chrono::steady_clock::now() - t_start).count();
+
     // --- Extraccion de malla -------------------------------------------
+    // Todos los hilos ya terminaron: se mide con el reloj del proceso, igual
+    // que en la linea base.
+    recon::StageTimer timer;
     // Ocurre una vez por corrida; se repite sobre el mismo volumen para
     // tener muestras.
     std::cout << "\nExtrayendo malla (" << opt.mesh_repeats << " repeticion(es))...\n";
@@ -280,6 +429,10 @@ int main(int argc, char** argv) try {
         std::cout << "\nExtraccion de malla (" << mesh_times.size() << " muestras, ms):\n";
         PrintSummaryRow("mesh", Summarize(mesh_wall));
 
+        std::cout << "\nCiclo de scans: " << std::setprecision(1) << loop_ms << " ms en total, "
+                  << std::setprecision(2) << 1000.0 * samples.size() / loop_ms
+                  << " scans/s (pipeline " << opt.pipeline << ")\n";
+
         std::cout << "\nMemoria: RSS final " << recon::CurrentRssKb() / 1024
                   << " MiB, pico " << recon::PeakRssKb() / 1024 << " MiB\n";
     }
@@ -289,13 +442,13 @@ int main(int argc, char** argv) try {
         csv << "scan,points_in,points_kept";
         for (const char* name : kStageNames) csv << "," << name << "_ms";
         for (const char* name : kStageNames) csv << "," << name << "_cpu_ms";
-        csv << ",rss_kb\n";
+        csv << ",rss_kb,done_ms\n";
         csv << std::defaultfloat << std::setprecision(6);
         for (const auto& s : samples) {
             csv << s.scan_index << "," << s.points_in << "," << s.points_kept;
             for (const auto& st : s.stage) csv << "," << st.wall_ms;
             for (const auto& st : s.stage) csv << "," << st.cpu_ms;
-            csv << "," << s.rss_kb << "\n";
+            csv << "," << s.rss_kb << "," << s.done_ms << "\n";
         }
         std::cout << "Tiempos por scan en: " << opt.timing_csv << "\n";
     }

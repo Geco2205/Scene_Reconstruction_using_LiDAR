@@ -8,9 +8,11 @@
 namespace recon {
 namespace {
 
-std::timespec ProcessCpuNow() {
+std::timespec CpuNow(StageTimer::CpuClock clock) {
     std::timespec ts{};
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+    clock_gettime(clock == StageTimer::CpuClock::kThread ? CLOCK_THREAD_CPUTIME_ID
+                                                         : CLOCK_PROCESS_CPUTIME_ID,
+                  &ts);
     return ts;
 }
 
@@ -22,13 +24,13 @@ double DiffMs(const std::timespec& a, const std::timespec& b) {
 }  // namespace
 
 void StageTimer::Start() {
-    cpu0_ = ProcessCpuNow();
+    cpu0_ = CpuNow(clock_);
     wall0_ = std::chrono::steady_clock::now();
 }
 
 StageTime StageTimer::Stop() const {
     const auto wall1 = std::chrono::steady_clock::now();
-    const std::timespec cpu1 = ProcessCpuNow();
+    const std::timespec cpu1 = CpuNow(clock_);
     StageTime t;
     t.wall_ms = std::chrono::duration<double, std::milli>(wall1 - wall0_).count();
     t.cpu_ms = DiffMs(cpu0_, cpu1);
