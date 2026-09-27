@@ -1,0 +1,23 @@
+label:        pc1-nicole
+date:         2026-09-27T13:08:16-06:00
+hostname:     irina
+kernel:       Linux 7.0.0-31-generic x86_64
+os:           Ubuntu 24.04.4 LTS
+cpu_model:    11th Gen Intel(R) Core(TM) i3-1115G4 @ 3.00GHz
+cpu_arch:     x86_64
+cpu_count:    4
+cpu_max_mhz:  4100.0000
+cpu_governor: powersave
+mem_total:    7.4 GiB
+compiler:     c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake:        cmake version 3.28.3
+git_commit:   e5ec09d
+git_dirty:    no
+build_type:   Release
+cxx_flags:    
+cxx_flags_rel: -O3 -DNDEBUG
+cxx_compiler: /usr/bin/c++
+scans_dir:    data/ncd_sample/scans
+mesh_repeats: 101
+extra_args:   --icp-voxel 1.0
+load_avg:     0.80 0.85 0.73
