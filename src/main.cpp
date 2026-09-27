@@ -3,8 +3,8 @@
 //   PCD -> filtro de rango (NEON) -> KISS-ICP (pose) -> VDBFusion (TSDF) -> PLY
 //
 // KISS-ICP aporta el registro 3D en CPU y VDBFusion la integracion TSDF y la
-// extraccion de malla. Este archivo los conecta y perfila cada etapa: tiempo de
-// pared, tiempo de CPU y memoria, una muestra por scan (ver Profiler.hpp).
+// extraccion de malla. Este archivo los conecta y cronometra cada etapa
+// (ver Profiler.hpp).
 
 #include <Eigen/Core>
 #include <algorithm>
@@ -79,13 +79,13 @@ bool ParseArgs(int argc, char** argv, Options& opt) {
     return true;
 }
 
-// Etapas por scan, en el orden en que se ejecutan. El nombre es el prefijo de
-// las columnas del CSV (<nombre>_ms y <nombre>_cpu_ms).
+// Etapas por scan, en orden de ejecucion. El nombre es el prefijo de las
+// columnas del CSV.
 enum Stage { kRead, kFilter, kConvert, kRegister, kTransform, kIntegrate, kNumStages };
 constexpr const char* kStageNames[kNumStages] = {
     "read", "filter", "convert", "register", "transform", "integrate"};
 
-// Una fila por scan procesado; alimenta el requisito de >100 muestras por etapa.
+// Fila del CSV de tiempos: una por scan procesado.
 struct ScanSample {
     std::size_t scan_index = 0;   // posicion del archivo en la secuencia ordenada
     std::size_t points_in = 0;
@@ -98,9 +98,7 @@ struct Summary {
     double mean = 0, stddev = 0, p50 = 0, p95 = 0, min = 0, max = 0;
 };
 
-// Estadisticos basicos para el resumen en consola. El analisis completo
-// (intervalos de confianza, graficos, comparacion entre maquinas) lo hace
-// tools/analyze_profile.py a partir de los CSV.
+// Estadisticos del resumen de consola. El resto sale de analyze_profile.py.
 Summary Summarize(std::vector<double> v) {
     Summary s;
     if (v.empty()) return s;
@@ -208,8 +206,7 @@ int main(int argc, char** argv) try {
         s.stage[kRegister] = timer.Stop();
 
         // --- Transformacion al marco global ----------------------------
-        // Se mide aparte de la integracion porque es trivialmente paralela
-        // (cada punto es independiente) y es candidata directa a optimizar.
+        // Antes caia dentro del timer de la integracion.
         timer.Start();
         std::vector<Eigen::Vector3d> global_points;
         global_points.reserve(points.size());
@@ -239,9 +236,8 @@ int main(int argc, char** argv) try {
     }
 
     // --- Extraccion de malla -------------------------------------------
-    // Ocurre una sola vez por corrida, asi que para tener >100 muestras de esta
-    // etapa se repite sobre el mismo volumen final (--mesh-repeats). El volumen
-    // no cambia entre repeticiones, por lo que todas producen la misma malla.
+    // Ocurre una vez por corrida; se repite sobre el mismo volumen para
+    // tener muestras.
     std::cout << "\nExtrayendo malla (" << opt.mesh_repeats << " repeticion(es))...\n";
     std::vector<recon::StageTime> mesh_times;
     mesh_times.reserve(opt.mesh_repeats);
@@ -262,7 +258,7 @@ int main(int argc, char** argv) try {
               << "Guardada en: " << opt.output << "  (escritura "
               << std::fixed << std::setprecision(1) << write_time.wall_ms << " ms)\n";
 
-    // --- Resumen ----------------------------------------------------------
+    // --- Resumen -------------------------------------------------------
     if (!samples.empty()) {
         std::cout << "\nTiempo de pared por etapa (" << samples.size() << " muestras, ms):\n"
                   << "  etapa          media      std      p50      p95      max\n"

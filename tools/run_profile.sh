@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-# run_profile.sh -- corre el pipeline con perfilado y guarda todo lo necesario
-# para comparar maquinas: tiempos por scan, tiempos de malla, info del sistema y
-# el log de la corrida.
+# run_profile.sh -- corre el pipeline con perfilado y deja los resultados en
+# <out-dir>/<label>/, listos para comparar maquinas.
 #
 # Uso:
 #   tools/run_profile.sh --label <nombre-maquina> --scans <dir> [opciones]
 #
 # Opciones:
-#   --label <nombre>      Nombre corto de la maquina, p. ej. pc-david, kria  (obligatorio)
-#   --scans <dir>         Directorio con los .pcd                            (obligatorio)
-#   --mesh-repeats <n>    Repeticiones de la extraccion de malla             (100)
-#   --out-dir <dir>       Carpeta base de resultados                         (results)
-#   --bin <ruta>          Ejecutable                                         (build/recon)
+#   --label <nombre>      Nombre corto de la maquina, p. ej. pc1, kria (obligatorio)
+#   --scans <dir>         Directorio con los .pcd                   (obligatorio)
+#   --mesh-repeats <n>    Repeticiones de la extraccion de malla           (101)
+#   --out-dir <dir>       Carpeta base de resultados                       (results)
+#   --bin <ruta>          Ejecutable                                       (build/recon)
 #   Cualquier otra opcion se pasa tal cual a recon (p. ej. --icp-voxel 1.0).
 #
 # Salida en <out-dir>/<label>/:
-#   timings.csv   una fila por scan (>100 muestras por etapa con la muestra de 300)
+#   timings.csv   una fila por scan
 #   mesh.csv      una fila por repeticion de la extraccion de malla
 #   system.txt    CPU, memoria, SO, compilador, commit y flags de la build
 #   run.log       salida completa del programa (+ /usr/bin/time -v si existe)

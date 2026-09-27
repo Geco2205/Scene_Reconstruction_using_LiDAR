@@ -156,8 +156,8 @@ tools/run_profile.sh --label pc-<name> --scans data/ncd_sample/scans --icp-voxel
 This writes `results/<label>/` with `timings.csv`, `mesh.csv`, `run.log` and
 `system.txt` (CPU, memory, OS, compiler, commit, CPU governor, load average).
 It takes about 3 minutes on a desktop CPU; on the Kria or the Jetson it can take
-several times longer, mostly because of the 100 mesh repetitions. Use
-`--mesh-repeats 101` as the minimum that still meets the requirement.
+several times longer, mostly because of the 101 mesh repetitions, which is the
+default.
 
 Commit the `results/<label>/` folder (the mesh `.ply` is ignored by git).
 
@@ -179,7 +179,7 @@ It reads every `results/*/timings.csv` and writes to `results/analysis/`:
 
 `--skip-first N` drops the first `N` scans of every machine as warm-up
 (the first registrations are cheaper because the local map is still empty).
-If you use it, state it in the paper.
+If you use it, note it next to the results.
 
 
 ## Viewing the mesh

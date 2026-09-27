@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
 """analyze_profile.py -- estadisticas y graficos del perfilado por etapa.
 
-Lee cada subcarpeta de <results> que tenga un timings.csv (una por maquina,
-creada por tools/run_profile.sh) y genera en <results>/analysis/:
+Lee cada subcarpeta de <results> con un timings.csv (una por maquina, creada
+por tools/run_profile.sh) y escribe en <results>/analysis/:
 
-  summary.md     tablas por maquina y comparacion entre maquinas (para el README
-                 y para copiar al paper)
+  summary.md     tablas por maquina y comparacion entre maquinas
   summary.csv    las mismas estadisticas en formato tabular
   fig_breakdown.png   tiempo medio por scan desglosado por etapa, por maquina
   fig_stages_box.png  distribucion de cada etapa por maquina (escala log)
   fig_timeline_<maquina>.png  tiempo por scan y memoria a lo largo de la secuencia
 
-Estadisticas por etapa: n, media, desviacion estandar, IC 95 % de la media,
-min, p50, p95, max, porcentaje del tiempo por scan y razon CPU/pared (cuantos
-nucleos uso la etapa en promedio).
+Por etapa: n, media, desviacion estandar, IC 95 % de la media, min, p50, p95,
+max, porcentaje del tiempo por scan y razon CPU/pared.
 
 Uso:
   python3 tools/analyze_profile.py results [--skip-first N]
 
---skip-first descarta los primeros N scans de cada maquina (calentamiento: los
-primeros registros de KISS-ICP son mas baratos porque el mapa esta vacio). Por
-defecto no descarta nada; si lo usan, reportenlo en el paper.
+--skip-first descarta los primeros N scans de cada maquina. Los primeros
+registros de KISS-ICP son mas baratos porque el mapa local aun esta vacio. Por
+defecto no descarta nada.
 
 Dependencias: numpy y matplotlib.
 """
@@ -36,8 +34,7 @@ import numpy as np
 
 STAGES = ["read", "filter", "convert", "register", "transform", "integrate"]
 
-# Colores categoricos en orden fijo (paleta validada para daltonismo en pares
-# adyacentes). Cada etapa y cada maquina conserva su color en todas las figuras.
+# Paleta categorica, mismo orden en todas las figuras.
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100",
            "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
 TEXT = "#0b0b0b"
@@ -323,8 +320,8 @@ def main():
         for m in machines:
             fig_timeline(m, out_dir, plt)
 
-    # El enunciado pide mas de 100 muestras por etapa. Se valida cada etapa por
-    # separado, incluida la malla, que antes no se comprobaba.
+    # Con menos de 100 muestras el intervalo de confianza de la media no sirve.
+    # Se valida etapa por etapa, incluida la malla.
     MIN_SAMPLES = 100
     problems = 0
     for m in machines:
@@ -348,8 +345,8 @@ def main():
             print(f"{'':>18}etapa mesh: sin mesh.csv  <-- FAIL (falta --mesh-csv)")
             problems += 1
     if problems:
-        print(f"\n{problems} etapa(s) sin suficientes muestras. El enunciado exige "
-              f"mas de {MIN_SAMPLES} por etapa: estos datos no pueden ir al paper.")
+        print(f"\n{problems} etapa(s) con {MIN_SAMPLES} muestras o menos. Se requieren "
+              f"mas de {MIN_SAMPLES} por etapa; estos datos no son publicables.")
     print(f"Resultados en {out_dir}/")
 
 
