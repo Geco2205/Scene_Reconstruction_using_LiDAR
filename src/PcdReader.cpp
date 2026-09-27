@@ -137,6 +137,28 @@ PointCloudSoA ReadPcd(const std::string& path) {
         const std::size_t read_points =
             static_cast<std::size_t>(file.gcount()) / (point_step ? point_step : 1);
 
+#if RECON_SOA_ALIGNED
+        // Escritura por indice sin ramas: se escribe siempre y el indice solo
+        // avanza si el punto es finito. Evita el chequeo de capacidad de
+        // push_back y el salto mal predicho por punto.
+        cloud.resize(read_points);
+        float* __restrict ox = cloud.x.data();
+        float* __restrict oy = cloud.y.data();
+        float* __restrict oz = cloud.z.data();
+        std::size_t k = 0;
+        for (std::size_t i = 0; i < read_points; ++i) {
+            const char* base = buffer.data() + i * point_step;
+            float px, py, pz;
+            std::memcpy(&px, base + fx->byte_off, 4);
+            std::memcpy(&py, base + fy->byte_off, 4);
+            std::memcpy(&pz, base + fz->byte_off, 4);
+            ox[k] = px;
+            oy[k] = py;
+            oz[k] = pz;
+            k += Finite(px, py, pz) ? 1 : 0;
+        }
+        cloud.resize(k);
+#else
         for (std::size_t i = 0; i < read_points; ++i) {
             const char* base = buffer.data() + i * point_step;
             float px, py, pz;
@@ -145,6 +167,7 @@ PointCloudSoA ReadPcd(const std::string& path) {
             std::memcpy(&pz, base + fz->byte_off, 4);
             if (Finite(px, py, pz)) cloud.push_back(px, py, pz);
         }
+#endif
     } else if (data_format == "binary_compressed") {
         throw std::runtime_error(
             "PCD binary_compressed no soportado (requiere LZF). Reconvierta el archivo a "
