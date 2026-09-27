@@ -22,6 +22,7 @@ found here to a GPU (NVIDIA Jetson Nano, CUDA) and an FPGA (AMD Kria KV260, HLS)
 | Range filter with ARM NEON (`src/RangeFilter.cpp`) | Written for this project | — |
 | Scan ordering, PLY writer, timer (`src/Io.cpp`) | Written for this project | — |
 | Synthetic scan generator (`tools/make_synthetic_scans.py`) | Written for this project | — |
+| Per-stage profiler (`src/Profiler.cpp`) and profiling scripts (`tools/run_profile.sh`, `tools/analyze_profile.py`) | Written for this project | — |
 
 
 
@@ -112,7 +113,9 @@ ls data/ncd | wc -l           # expected: 15301
 | `--icp-voxel <m>` | `0.50` | KISS-ICP voxel size |
 | `--min-range <m>` | `1.0` | Minimum point range |
 | `--max-range <m>` | `60.0` | Maximum point range |
-| `--timing-csv <file>` | — | Write per-stage timings to a CSV file |
+| `--timing-csv <file>` | — | Write per-scan timings and memory to a CSV file |
+| `--mesh-repeats <n>` | `1` | Repeat mesh extraction `n` times on the final volume |
+| `--mesh-csv <file>` | — | Write the time of each mesh extraction to a CSV file |
 
 Scans are processed in timestamp order. File names follow
 `cloud_<sec>_<nsec>.pcd` and are sorted numerically, because the nanosecond
@@ -121,8 +124,62 @@ field does not always have 9 digits.
 ## Outputs
 
 - **`<out>.ply`**: triangle mesh (ASCII PLY). Open it with MeshLab or CloudCompare.
-- **`<timing-csv>`**: one row per scan with columns
-  `scan, points_in, points_kept, read_ms, filter_ms, convert_ms, register_ms, integrate_ms`.
+- **`<timing-csv>`**: one row per scan. For each stage (`read`, `filter`,
+  `convert`, `register`, `transform`, `integrate`) there is a wall-clock column
+  `<stage>_ms` and a process CPU-time column `<stage>_cpu_ms`, plus
+  `scan, points_in, points_kept` and `rss_kb` (resident memory after the scan).
+- **`<mesh-csv>`**: one row per mesh extraction with
+  `repeat, mesh_ms, mesh_cpu_ms, vertices, triangles`.
+
+## Profiling
+
+Each stage is measured per scan with two clocks: wall time (`steady_clock`) and
+process CPU time (`CLOCK_PROCESS_CPUTIME_ID`, summed over all threads). Their
+ratio tells how many cores a stage used on average: about 1.0 means serial,
+above 1.0 means the stage is multithreaded (KISS-ICP uses TBB internally).
+Memory is read from `/proc/self/statm` after every scan, and the process peak
+from `getrusage`/`/usr/bin/time -v`.
+
+The 300-scan sample gives 300 samples for every per-scan stage. Mesh extraction
+happens once per sequence, so it is repeated on the final volume
+(`--mesh-repeats`, 100 by default in the script) to reach more than 100 samples.
+
+### 1. Run on each machine
+
+Close other heavy programs first, and plug in laptops. Pick a short `--label`
+that identifies the machine (it becomes the folder name):
+
+```bash
+tools/run_profile.sh --label pc-<name> --scans data/ncd_sample/scans --icp-voxel 1.0
+```
+
+This writes `results/<label>/` with `timings.csv`, `mesh.csv`, `run.log` and
+`system.txt` (CPU, memory, OS, compiler, commit, CPU governor, load average).
+It takes about 3 minutes on a desktop CPU; on the Kria or the Jetson it can take
+several times longer, mostly because of the 100 mesh repetitions. Use
+`--mesh-repeats 101` as the minimum that still meets the requirement.
+
+Commit the `results/<label>/` folder (the mesh `.ply` is ignored by git).
+
+### 2. Analyze
+
+```bash
+python3 tools/analyze_profile.py results
+```
+
+It reads every `results/*/timings.csv` and writes to `results/analysis/`:
+
+| File | Content |
+|---|---|
+| `summary.md` | Per machine: n, mean, std, 95 % CI, min, p50, p95, max, share of the scan time and CPU/wall ratio for each stage, plus memory and throughput. A cross-machine comparison table when there is more than one machine. |
+| `summary.csv` | The same statistics in tabular form |
+| `fig_breakdown.png` | Mean time per scan split by stage, one bar per machine |
+| `fig_stages_box.png` | Distribution of every stage per machine (log scale) |
+| `fig_timeline_<label>.png` | Time per scan and resident memory along the sequence |
+
+`--skip-first N` drops the first `N` scans of every machine as warm-up
+(the first registrations are cheaper because the local map is still empty).
+If you use it, state it in the paper.
 
 
 ## Viewing the mesh
