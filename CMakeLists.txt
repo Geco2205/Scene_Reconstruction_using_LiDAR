@@ -25,6 +25,55 @@ endif()
 set(KISS_ICP_TAG "v1.0.0"   CACHE STRING "Tag de PRBonn/kiss-icp")
 set(VDBFUSION_TAG "v0.1.6"  CACHE STRING "Tag de PRBonn/vdbfusion")
 
+# -----------------------------------------------------------------------------
+# Optimizaciones (ver docs/OPTIMIZATIONS.md)
+#
+# Cada una se activa por separado para poder medir el antes y el despues. Con
+# todas en su valor por defecto se obtiene la LINEA BASE:
+#
+#   cmake -B build -DCMAKE_BUILD_TYPE=Release                       # base
+#   cmake -B build-opt -DRECON_OPT_NATIVE=ON -DRECON_OPT_LTO=ON \
+#         -DRECON_OPT_SOA_ALIGNED=ON                                # optimizada
+#
+# El paralelismo por tareas no es una opcion de compilacion: se elige al correr
+# con --pipeline off|prefetch|full, asi se compara con el mismo binario.
+#
+# NATIVE y LTO se aplican ANTES de FetchContent para que alcancen tambien a
+# KISS-ICP y VDBFusion, que es donde se va ~97 % del tiempo por scan. OpenVDB y
+# TBB vienen del sistema ya compilados, asi que a ellos no los alcanza.
+# -----------------------------------------------------------------------------
+option(RECON_OPT_NATIVE      "-march=native (x86) / -mcpu=native (ARM)"        OFF)
+option(RECON_OPT_LTO         "Link-Time Optimization (-flto)"                  OFF)
+option(RECON_OPT_SOA_ALIGNED "SoA alineado a 64 B + compactacion sin ramas"    OFF)
+option(RECON_OPT_NEON        "Filtro de rango con intrinsics NEON (solo ARM)"  ON)
+
+include(CheckCXXCompilerFlag)
+if(RECON_OPT_NATIVE)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm")
+    # En ARM GCC no acepta -march=native en todas las versiones; -mcpu=native
+    # fija el conjunto de instrucciones y el ajuste al nucleo (Cortex-A53/A57).
+    check_cxx_compiler_flag(-mcpu=native HAS_MCPU_NATIVE)
+    if(HAS_MCPU_NATIVE)
+      add_compile_options(-mcpu=native)
+    endif()
+  else()
+    add_compile_options(-march=native -mtune=native)
+  endif()
+endif()
+
+if(RECON_OPT_LTO)
+  include(CheckIPOSupported)
+  check_ipo_supported(RESULT HAS_IPO OUTPUT IPO_MSG LANGUAGES CXX)
+  if(HAS_IPO)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  else()
+    message(WARNING "LTO no soportado por este compilador: ${IPO_MSG}")
+  endif()
+endif()
+
+message(STATUS "Optimizaciones: NATIVE=${RECON_OPT_NATIVE} LTO=${RECON_OPT_LTO} "
+               "SOA_ALIGNED=${RECON_OPT_SOA_ALIGNED} NEON=${RECON_OPT_NEON}")
+
 include(FetchContent)
 
 FetchContent_Declare(kiss_icp
@@ -65,19 +114,23 @@ target_link_libraries(recon_core PUBLIC Eigen3::Eigen)
 # depende de que los valores no finitos ya fueron descartados en la lectura.
 target_compile_options(recon_core PRIVATE -O3 -Wall -Wextra)
 
-# En ARM, -mcpu=native activa NEON y ajusta al nucleo concreto (Cortex-A57 en la
-# Jetson Nano, Cortex-A53 en la Kria). En AArch64 NEON ya viene por defecto.
-include(CheckCXXCompilerFlag)
+# Interruptores que cambian el codigo (no solo los flags). Se exponen como macros
+# para que el binario imprima con que se compilo (queda en run.log).
+target_compile_definitions(recon_core PUBLIC
+  RECON_SOA_ALIGNED=$<BOOL:${RECON_OPT_SOA_ALIGNED}>
+  RECON_NEON_REQUESTED=$<BOOL:${RECON_OPT_NEON}>
+  RECON_OPT_NATIVE_ON=$<BOOL:${RECON_OPT_NATIVE}>
+  RECON_OPT_LTO_ON=$<BOOL:${CMAKE_INTERPROCEDURAL_OPTIMIZATION}>)
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm")
-  check_cxx_compiler_flag(-mcpu=native HAS_MCPU_NATIVE)
-  if(HAS_MCPU_NATIVE)
-    target_compile_options(recon_core PRIVATE -mcpu=native)
-  endif()
-  message(STATUS "Compilando para ARM: camino NEON activo")
+  message(STATUS "Compilando para ARM: camino NEON ${RECON_OPT_NEON}")
 else()
   message(STATUS "Compilando para ${CMAKE_SYSTEM_PROCESSOR}: camino escalar")
 endif()
 
+# Hilos para el pipeline por tareas (--pipeline).
+find_package(Threads REQUIRED)
+
 add_executable(recon src/main.cpp)
-target_link_libraries(recon PRIVATE recon_core kiss_icp_pipeline vdbfusion)
+target_link_libraries(recon PRIVATE recon_core kiss_icp_pipeline vdbfusion Threads::Threads)
 target_compile_options(recon PRIVATE -O3 -Wall -Wextra)
