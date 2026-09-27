@@ -76,7 +76,9 @@ mkdir -p "$OUT"
     echo "cmake:        $(cmake --version | head -1)"
     echo "git_commit:   $(git rev-parse --short HEAD 2>/dev/null || echo n/a)"
     echo "git_dirty:    $( [[ -n "$(git status --porcelain --untracked-files=no 2>/dev/null)" ]] && echo yes || echo no )"
-    cache=build/CMakeCache.txt
+    # El cache se busca junto al ejecutable, para que --bin build-opt/recon
+    # reporte los flags de esa build y no los de build/.
+    cache="$(dirname "$BIN")/CMakeCache.txt"
     if [[ -r $cache ]]; then
         echo "build_type:   $(sed -n 's/^CMAKE_BUILD_TYPE:[A-Z]*=//p' $cache)"
         # Flags exactos de la build. Sin esto no se puede distinguir una corrida
@@ -84,10 +86,20 @@ mkdir -p "$OUT"
         echo "cxx_flags:    $(sed -n 's/^CMAKE_CXX_FLAGS:STRING=//p' $cache)"
         echo "cxx_flags_rel: $(sed -n 's/^CMAKE_CXX_FLAGS_RELEASE:STRING=//p' $cache)"
         echo "cxx_compiler: $(sed -n 's/^CMAKE_CXX_COMPILER:[A-Z]*=//p' $cache)"
+        # Interruptores de docs/OPTIMIZATIONS.md (todos OFF salvo NEON = base).
+        for opt in RECON_OPT_NATIVE RECON_OPT_LTO RECON_OPT_SOA_ALIGNED RECON_OPT_NEON; do
+            printf '%-13s %s\n' "${opt#RECON_}:" "$(sed -n "s/^$opt:BOOL=//p" $cache)"
+        done
     fi
     echo "scans_dir:    $SCANS"
     echo "mesh_repeats: $MESH_REPEATS"
     echo "extra_args:   ${EXTRA[*]:-}"
+    # Modo de paralelismo por tareas (off si no se paso --pipeline).
+    pipe=off
+    for ((k = 0; k < ${#EXTRA[@]}; k++)); do
+        [[ "${EXTRA[$k]}" == "--pipeline" ]] && pipe="${EXTRA[$((k + 1))]:-off}"
+    done
+    echo "pipeline:     $pipe"
     echo "load_avg:     $(cut -d' ' -f1-3 /proc/loadavg)"
 } > "$OUT/system.txt"
 

@@ -80,3 +80,5 @@ data/
 # run.log tiene el RSS pico que reporta /usr/bin/time -v, y analyze_profile.py
 # lo lee de ahi. Sin esto, el pico de memoria no aparece en las tablas.
 !results/**/*.log
+# Copias de la consola de run_optimizations.sh (duplican run.log)
+results/**/*.console.log

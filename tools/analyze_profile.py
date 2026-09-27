@@ -16,6 +16,11 @@ max, porcentaje del tiempo por scan y razon CPU/pared.
 Uso:
   python3 tools/analyze_profile.py results [--skip-first N]
 
+Periodo: con --pipeline las etapas se traslapan y la suma de etapas deja de ser
+el tiempo por scan. Si timings.csv trae la columna done_ms (instante en que cada
+scan termino), el periodo entre scans consecutivos es la medida real de
+rendimiento y de ahi sale el throughput. Sin done_ms (CSV viejos) se usa la suma.
+
 --skip-first descarta los primeros N scans de cada maquina. Los primeros
 registros de KISS-ICP son mas baratos porque el mapa local aun esta vacio. Por
 defecto no descarta nada.
@@ -103,14 +108,37 @@ def load_machine(folder, skip_first):
         timings = {k: v[skip_first:] for k, v in timings.items()}
     mesh = read_csv(folder / "mesh.csv") if (folder / "mesh.csv").exists() else {}
     total = sum(timings[f"{s}_ms"] for s in STAGES)
+    # Periodo entre scans terminados. El primero se mide desde el inicio del
+    # ciclo (done_ms del primero). Con --skip-first el primer periodo se pierde.
+    period = None
+    if "done_ms" in timings and timings["done_ms"].size > 1:
+        done = timings["done_ms"]
+        period = np.diff(done) if skip_first else np.diff(np.concatenate(([0.0], done)))
     return {
         "label": folder.name,
         "system": read_system(folder / "system.txt"),
         "timings": timings,
         "total": total,
+        "period": period,
         "mesh": mesh,
         "peak_rss_kb": peak_rss_from_log(folder / "run.log"),
     }
+
+
+def scan_period_ms(m):
+    """Tiempo medio entre scans: periodo real si hay done_ms, si no la suma."""
+    return float(m["period"].mean()) if m["period"] is not None else float(m["total"].mean())
+
+
+def variant(m):
+    """Descripcion corta de la build y el modo de ejecucion."""
+    s = m["system"]
+    opts = [k for k in ("OPT_NATIVE", "OPT_LTO", "OPT_SOA_ALIGNED") if s.get(k, "").upper() == "ON"]
+    neon = s.get("OPT_NEON", "")
+    txt = ", ".join(o.replace("OPT_", "").lower() for o in opts) or "base"
+    if neon.upper() == "OFF":
+        txt += ", no-neon"
+    return f"{txt}; pipeline {s.get('pipeline', 'off')}"
 
 
 def fmt(x, digits=2):
@@ -131,6 +159,9 @@ def machine_rows(m):
         rows.append({"stage": s, **st, "share": 100 * st["mean"] / total_mean, "cpu_ratio": ratio})
     st = stats(m["total"])
     rows.append({"stage": "total/scan", **st, "share": 100.0, "cpu_ratio": float("nan")})
+    if m["period"] is not None:
+        st = stats(m["period"])
+        rows.append({"stage": "period", **st, "share": float("nan"), "cpu_ratio": float("nan")})
     if m["mesh"]:
         st = stats(m["mesh"]["mesh_ms"])
         ratio = float(m["mesh"]["mesh_cpu_ms"].sum() / m["mesh"]["mesh_ms"].sum())
@@ -144,7 +175,12 @@ def write_summary(machines, out_dir, skip_first):
               "CI95 is the half-width of the 95 % confidence interval of the mean. "
               "CPU/wall is process CPU time divided by wall time during the stage "
               "(≈1 serial, >1 multithreaded). `mesh` runs once per sequence and is "
-              "repeated on the final volume to collect samples.")
+              "repeated on the final volume to collect samples. "
+              "`total/scan` is the sum of the stages (work per scan); `period` is the "
+              "measured time between consecutive finished scans. They match in "
+              "sequential mode and differ with `--pipeline`, where stages overlap: "
+              "throughput comes from `period`. With `--pipeline` the CPU columns use "
+              "per-thread CPU time and do not include KISS-ICP's TBB workers.")
     if skip_first:
         md.append(f"The first {skip_first} scans of each machine were discarded as warm-up.")
     md.append("")
@@ -161,11 +197,12 @@ def write_summary(machines, out_dir, skip_first):
         md.append(f"- OS: {sysinfo.get('os', '?')}; compiler: {sysinfo.get('compiler', '?')}")
         md.append(f"- Commit: {sysinfo.get('git_commit', '?')}, build: {sysinfo.get('build_type', '?')}, "
                   f"args: `{sysinfo.get('extra_args', '')}`")
+        md.append(f"- Variant: {variant(m)}")
         rss = m["timings"]["rss_kb"]
         peak = m["peak_rss_kb"]
         md.append(f"- Memory: RSS after first scan {rss[0] / 1024:.0f} MiB, after last scan "
                   f"{rss[-1] / 1024:.0f} MiB" + (f", process peak {peak / 1024:.0f} MiB" if peak else ""))
-        md.append(f"- Throughput: {1000 / m['total'].mean():.2f} scans/s "
+        md.append(f"- Throughput: {1000 / scan_period_ms(m):.2f} scans/s "
                   f"(sensor runs at 10 scans/s)")
         md.append("")
         md.append(header)
@@ -183,9 +220,15 @@ def write_summary(machines, out_dir, skip_first):
         md.append("| Stage | " + " | ".join(m["label"] for m in machines) + " |")
         md.append("|---|" + "---:|" * len(machines))
         per = {m["label"]: {r["stage"]: r for r in machine_rows(m)} for m in machines}
-        for s in STAGES + ["total/scan", "mesh (once)"]:
+        for s in STAGES + ["total/scan", "period", "mesh (once)"]:
             cells = [fmt(per[m["label"]].get(s, {}).get("mean")) for m in machines]
             md.append(f"| {s} | " + " | ".join(cells) + " |")
+        cells = [fmt(1000 / scan_period_ms(m)) for m in machines]
+        md.append("| **throughput (scans/s)** | " + " | ".join(cells) + " |")
+        base = machines[0]
+        cells = [fmt(scan_period_ms(base) / scan_period_ms(m)) for m in machines]
+        md.append(f"| speedup vs {base['label']} | " + " | ".join(cells) + " |")
+        md.append("| variant | " + " | ".join(variant(m) for m in machines) + " |")
         md.append("")
 
     (out_dir / "summary.md").write_text("\n".join(md) + "\n")
@@ -223,11 +266,13 @@ def fig_breakdown(machines, out_dir, plt):
         ax.barh(y, vals, left=left, height=0.55, color=PALETTE[i], label=s,
                 edgecolor="white", linewidth=1.0)
         left += vals
-    for yi, total in zip(y, left):
-        ax.text(total, yi, f"  {total:.1f} ms", va="center", fontsize=8, color=TEXT)
+    for yi, total, m in zip(y, left, machines):
+        per = scan_period_ms(m)
+        extra = f" (period {per:.1f})" if m["period"] is not None and abs(per - total) > 0.05 * total else ""
+        ax.text(total, yi, f"  {total:.1f} ms{extra}", va="center", fontsize=8, color=TEXT)
     ax.set_yticks(y, labels, fontsize=8, color=TEXT)
     ax.set_xlabel("Mean time per scan (ms)", fontsize=8, color=TEXT_2)
-    ax.set_xlim(0, left.max() * 1.18)
+    ax.set_xlim(0, left.max() * 1.35)
     ax.legend(ncol=len(STAGES), fontsize=7, frameon=False, loc="lower left",
               bbox_to_anchor=(0, 1.0), handlelength=1.2, columnspacing=1.0)
     fig.tight_layout()
@@ -297,10 +342,16 @@ def main():
     ap.add_argument("results", type=Path, help="Carpeta con una subcarpeta por maquina")
     ap.add_argument("--skip-first", type=int, default=0, help="Scans de calentamiento a descartar")
     ap.add_argument("--no-plots", action="store_true", help="Solo tablas, sin figuras")
+    ap.add_argument("--ref", default=None,
+                    help="Carpeta de referencia para el speedup (por defecto 'base' si existe)")
     args = ap.parse_args()
 
     folders = sorted(p for p in args.results.iterdir() if (p / "timings.csv").exists())
     machines = [m for m in (load_machine(p, args.skip_first) for p in folders) if m]
+    # La referencia del speedup es la primera columna: "base" si existe
+    # (resultados de run_optimizations.sh), si no --ref, si no la primera.
+    ref = args.ref or "base"
+    machines.sort(key=lambda m: m["label"] != ref)
     if not machines:
         sys.exit(f"No hay timings.csv en ninguna subcarpeta de {args.results}")
     if len(machines) > len(PALETTE):
@@ -327,7 +378,8 @@ def main():
     for m in machines:
         n = len(m["total"])
         warn = "" if n > MIN_SAMPLES else "  <-- menos de 100 muestras"
-        print(f"{m['label']:>16}: {n} scans, {m['total'].mean():.1f} ms/scan{warn}")
+        print(f"{m['label']:>16}: {n} scans, {m['total'].mean():.1f} ms trabajo/scan, "
+              f"{scan_period_ms(m):.1f} ms periodo{warn}")
         if n <= MIN_SAMPLES:
             problems += 1
         for s in STAGES:
