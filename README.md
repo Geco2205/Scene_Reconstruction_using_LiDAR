@@ -116,7 +116,6 @@ ls data/ncd | wc -l           # expected: 15301
 | `--timing-csv <file>` | — | Write per-scan timings and memory to a CSV file |
 | `--mesh-repeats <n>` | `1` | Repeat mesh extraction `n` times on the final volume |
 | `--mesh-csv <file>` | — | Write the time of each mesh extraction to a CSV file |
-| `--pipeline <mode>` | `off` | Task parallelism: `off`, `prefetch` or `full` (see [Optimizations](#optimizations)) |
 
 Scans are processed in timestamp order. File names follow
 `cloud_<sec>_<nsec>.pcd` and are sorted numerically, because the nanosecond
@@ -128,9 +127,7 @@ field does not always have 9 digits.
 - **`<timing-csv>`**: one row per scan. For each stage (`read`, `filter`,
   `convert`, `register`, `transform`, `integrate`) there is a wall-clock column
   `<stage>_ms` and a process CPU-time column `<stage>_cpu_ms`, plus
-  `scan, points_in, points_kept`, `rss_kb` (resident memory after the scan) and
-  `done_ms` (when the scan finished, from the start of the scan loop; with
-  `--pipeline` this gives the real time between scans).
+  `scan, points_in, points_kept` and `rss_kb` (resident memory after the scan).
 - **`<mesh-csv>`**: one row per mesh extraction with
   `repeat, mesh_ms, mesh_cpu_ms, vertices, triangles`.
 
@@ -184,40 +181,6 @@ It reads every `results/*/timings.csv` and writes to `results/analysis/`:
 (the first registrations are cheaper because the local map is still empty).
 If you use it, note it next to the results.
 
-
-## Optimizations
-
-Every optimization can be switched on or off independently, so the effect of
-each one can be measured against the baseline. What was applied, what was not
-and why is documented in [`docs/OPTIMIZATIONS.md`](docs/OPTIMIZATIONS.md).
-
-| Switch | Where | Default | Effect |
-|---|---|---|---|
-| `RECON_OPT_NATIVE` | CMake | `OFF` | `-march=native` (x86) / `-mcpu=native` (ARM), also applied to KISS-ICP and VDBFusion |
-| `RECON_OPT_LTO` | CMake | `OFF` | Link-Time Optimization (`-flto`) |
-| `RECON_OPT_SOA_ALIGNED` | CMake | `OFF` | 64-byte aligned SoA arrays and branch-free compaction in the reader and filter |
-| `RECON_OPT_NEON` | CMake | `ON` | NEON intrinsics in the range filter (ARM only; `OFF` measures the scalar path) |
-| `--pipeline` | runtime | `off` | `prefetch`: read and filter scan *k+1* while scan *k* is registered. `full`: also integrate scan *k* while scan *k+1* is registered (3 threads) |
-
-The baseline is the default build with `--pipeline off`. An optimized build:
-
-```bash
-cmake -B build-opt -DCMAKE_BUILD_TYPE=Release \
-      -DRECON_OPT_NATIVE=ON -DRECON_OPT_LTO=ON -DRECON_OPT_SOA_ALIGNED=ON
-cmake --build build-opt -j$(nproc)
-./build-opt/recon --scans data/ncd_sample/scans --icp-voxel 1.0 --pipeline full
-```
-
-To measure the before and after of every optimization on one machine
-(builds each variant, runs it with profiling and writes the comparison table):
-
-```bash
-tools/run_optimizations.sh --label pc-<name> --scans data/ncd_sample/scans --icp-voxel 1.0
-```
-
-Results go to `results/opt-<label>/<variant>/` and the table to
-`results/opt-<label>/analysis/summary.md`. On ARM it also runs `noneon`
-(same build with `RECON_OPT_NEON=OFF`) to isolate the effect of NEON.
 
 ## Viewing the mesh
 
