@@ -1,0 +1,28 @@
+label:        native
+date:         2026-09-27T19:29:40-06:00
+hostname:     keillin-loaisiga-IdeaPad-3-14ITL6
+kernel:       Linux 7.0.0-31-generic x86_64
+os:           Ubuntu 24.04.2 LTS
+cpu_model:    11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+cpu_arch:     x86_64
+cpu_count:    8
+cpu_max_mhz:  4200.0000
+cpu_governor: powersave
+mem_total:    7.6 GiB
+compiler:     c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake:        cmake version 3.28.3
+git_commit:   6db82e2
+git_dirty:    no
+build_type:   Release
+cxx_flags:    
+cxx_flags_rel: -O3 -DNDEBUG
+cxx_compiler: /usr/bin/c++
+OPT_NATIVE:   ON
+OPT_LTO:      OFF
+OPT_SOA_ALIGNED: OFF
+OPT_NEON:     ON
+scans_dir:    data/ncd_sample/scans
+mesh_repeats: 101
+extra_args:   --pipeline off --icp-voxel 1.0
+pipeline:     off
+load_avg:     1.55 1.50 1.45

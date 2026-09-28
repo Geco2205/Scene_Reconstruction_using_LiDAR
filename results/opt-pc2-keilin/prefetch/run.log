@@ -1,0 +1,85 @@
+Scans encontrados : 300  (se procesan 300)
+Voxel TSDF / ICP  : 0.1 m / 1 m
+Rango             : [1, 60] m
+Filtro            : escalar
+Compilador        : 13.3.0
+Optimizaciones    : NATIVE=0 LTO=0 SOA_ALIGNED=0
+Pipeline          : prefetch
+
+  [   0]   65536 ->   57269 pts      51.6 ms       68 MiB
+  [  10]   65536 ->   57244 pts      69.0 ms       97 MiB
+  [  20]   65536 ->   56950 pts      52.0 ms      100 MiB
+  [  30]   65536 ->   56945 pts      57.6 ms      103 MiB
+  [  40]   65536 ->   56454 pts      55.2 ms      105 MiB
+  [  50]   65536 ->   56687 pts      66.4 ms      108 MiB
+  [  60]   65536 ->   56751 pts      65.0 ms      110 MiB
+  [  70]   65536 ->   56419 pts      57.4 ms      111 MiB
+  [  80]   65536 ->   56429 pts      55.7 ms      113 MiB
+  [  90]   65536 ->   55948 pts      70.9 ms      115 MiB
+  [ 100]   65536 ->   56222 pts      69.9 ms      115 MiB
+  [ 110]   65536 ->   56157 pts      61.6 ms      117 MiB
+  [ 120]   65536 ->   55769 pts      66.4 ms      117 MiB
+  [ 130]   65536 ->   55892 pts      50.0 ms      119 MiB
+  [ 140]   65536 ->   55656 pts      52.3 ms      120 MiB
+  [ 150]   65536 ->   54967 pts      52.4 ms      121 MiB
+  [ 160]   65536 ->   54486 pts      54.1 ms      122 MiB
+  [ 170]   65536 ->   54481 pts      50.5 ms      123 MiB
+  [ 180]   65536 ->   53447 pts      43.7 ms      124 MiB
+  [ 190]   65536 ->   53182 pts      36.3 ms      125 MiB
+  [ 200]   65536 ->   53484 pts      32.8 ms      126 MiB
+  [ 210]   65536 ->   53358 pts      34.9 ms      127 MiB
+  [ 220]   65536 ->   53962 pts      33.3 ms      129 MiB
+  [ 230]   65536 ->   53697 pts      40.3 ms      131 MiB
+  [ 240]   65536 ->   53704 pts      39.0 ms      132 MiB
+  [ 250]   65536 ->   54038 pts      41.6 ms      134 MiB
+  [ 260]   65536 ->   53890 pts      35.4 ms      136 MiB
+  [ 270]   65536 ->   53544 pts      45.8 ms      139 MiB
+  [ 280]   65536 ->   53328 pts      38.9 ms      141 MiB
+  [ 290]   65536 ->   53294 pts      41.8 ms      143 MiB
+  [ 299]   65536 ->   53339 pts      60.0 ms      145 MiB
+
+Extrayendo malla (101 repeticion(es))...
+Malla: 851194 vertices, 1476686 triangulos
+Guardada en: results/opt-pc2-keilin/prefetch/mesh.ply  (escritura 717.6 ms)
+
+Tiempo de pared por etapa (300 muestras, ms):
+  etapa          media      std      p50      p95      max
+  read            0.88     0.20     0.78     1.25     1.57
+  filter          0.30     0.18     0.20     0.67     0.83
+  convert         0.22     0.10     0.17     0.41     0.55
+  register       22.11    10.90    22.02    41.50    66.67
+  transform       0.99     0.07     0.98     1.09     1.41
+  integrate      27.58     2.67    26.90    31.00    41.79
+  TOTAL/scan     52.08    12.61    52.33    72.75   100.32
+
+Extraccion de malla (101 muestras, ms):
+  mesh          729.13    23.45   722.92   767.16   841.77
+
+Ciclo de scans: 15226.8 ms en total, 19.70 scans/s (pipeline prefetch)
+
+Memoria: RSS final 263 MiB, pico 352 MiB
+Tiempos por scan en: results/opt-pc2-keilin/prefetch/timings.csv
+Tiempos de malla en: results/opt-pc2-keilin/prefetch/mesh.csv
+	Command being timed: "build-base/recon --scans data/ncd_sample/scans --out results/opt-pc2-keilin/prefetch/mesh.ply --timing-csv results/opt-pc2-keilin/prefetch/timings.csv --mesh-csv results/opt-pc2-keilin/prefetch/mesh.csv --mesh-repeats 101 --pipeline prefetch --icp-voxel 1.0"
+	User time (seconds): 122.71
+	System time (seconds): 2.07
+	Percent of CPU this job got: 139%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:29.63
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 360528
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1099720
+	Voluntary context switches: 19184
+	Involuntary context switches: 58925
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 99296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,85 @@
+Scans encontrados : 300  (se procesan 300)
+Voxel TSDF / ICP  : 0.1 m / 1 m
+Rango             : [1, 60] m
+Filtro            : escalar
+Compilador        : 13.3.0
+Optimizaciones    : NATIVE=0 LTO=1 SOA_ALIGNED=0
+Pipeline          : off
+
+  [   0]   65536 ->   57269 pts      51.0 ms       62 MiB
+  [  10]   65536 ->   57244 pts      68.0 ms       91 MiB
+  [  20]   65536 ->   56950 pts      50.7 ms       93 MiB
+  [  30]   65536 ->   56945 pts      55.8 ms       96 MiB
+  [  40]   65536 ->   56454 pts      53.7 ms       98 MiB
+  [  50]   65536 ->   56687 pts      64.1 ms      101 MiB
+  [  60]   65536 ->   56751 pts      63.3 ms      102 MiB
+  [  70]   65536 ->   56419 pts      55.8 ms      104 MiB
+  [  80]   65536 ->   56429 pts      56.7 ms      106 MiB
+  [  90]   65536 ->   55948 pts      68.3 ms      108 MiB
+  [ 100]   65536 ->   56222 pts      69.3 ms      109 MiB
+  [ 110]   65536 ->   56157 pts      62.8 ms      111 MiB
+  [ 120]   65536 ->   55769 pts      64.5 ms      111 MiB
+  [ 130]   65536 ->   55892 pts      49.9 ms      113 MiB
+  [ 140]   65536 ->   55656 pts      51.2 ms      113 MiB
+  [ 150]   65536 ->   54967 pts      50.6 ms      114 MiB
+  [ 160]   65536 ->   54486 pts      53.0 ms      115 MiB
+  [ 170]   65536 ->   54481 pts      47.3 ms      116 MiB
+  [ 180]   65536 ->   53447 pts      38.6 ms      117 MiB
+  [ 190]   65536 ->   53182 pts      32.8 ms      118 MiB
+  [ 200]   65536 ->   53484 pts      32.0 ms      119 MiB
+  [ 210]   65536 ->   53358 pts      35.7 ms      120 MiB
+  [ 220]   65536 ->   53962 pts      32.5 ms      122 MiB
+  [ 230]   65536 ->   53697 pts      37.3 ms      124 MiB
+  [ 240]   65536 ->   53704 pts      34.6 ms      125 MiB
+  [ 250]   65536 ->   54038 pts      38.7 ms      127 MiB
+  [ 260]   65536 ->   53890 pts      34.0 ms      129 MiB
+  [ 270]   65536 ->   53544 pts      51.3 ms      131 MiB
+  [ 280]   65536 ->   53328 pts      41.6 ms      133 MiB
+  [ 290]   65536 ->   53294 pts      41.1 ms      135 MiB
+  [ 299]   65536 ->   53339 pts      58.0 ms      137 MiB
+
+Extrayendo malla (101 repeticion(es))...
+Malla: 851194 vertices, 1476686 triangulos
+Guardada en: results/opt-pc2-keilin/lto/mesh.ply  (escritura 701.7 ms)
+
+Tiempo de pared por etapa (300 muestras, ms):
+  etapa          media      std      p50      p95      max
+  read            0.55     0.09     0.52     0.69     1.47
+  filter          0.18     0.03     0.18     0.21     0.37
+  convert         0.16     0.04     0.15     0.19     0.42
+  register       21.35    10.86    20.74    39.94    69.52
+  transform       0.93     0.08     0.91     1.07     1.48
+  integrate      27.61     2.77    27.21    30.85    41.86
+  TOTAL/scan     50.78    12.85    50.84    71.15   108.73
+
+Extraccion de malla (101 muestras, ms):
+  mesh          702.88    18.71   697.11   746.15   784.80
+
+Ciclo de scans: 15253.4 ms en total, 19.67 scans/s (pipeline off)
+
+Memoria: RSS final 350 MiB, pico 349 MiB
+Tiempos por scan en: results/opt-pc2-keilin/lto/timings.csv
+Tiempos de malla en: results/opt-pc2-keilin/lto/mesh.csv
+	Command being timed: "build-lto/recon --scans data/ncd_sample/scans --out results/opt-pc2-keilin/lto/mesh.ply --timing-csv results/opt-pc2-keilin/lto/timings.csv --mesh-csv results/opt-pc2-keilin/lto/mesh.csv --mesh-repeats 101 --pipeline off --icp-voxel 1.0"
+	User time (seconds): 120.09
+	System time (seconds): 1.12
+	Percent of CPU this job got: 139%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:26.99
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 358268
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 368720
+	Voluntary context switches: 18704
+	Involuntary context switches: 62280
+	Swaps: 0
+	File system inputs: 8
+	File system outputs: 99296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

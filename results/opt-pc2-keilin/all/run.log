@@ -1,0 +1,85 @@
+Scans encontrados : 300  (se procesan 300)
+Voxel TSDF / ICP  : 0.1 m / 1 m
+Rango             : [1, 60] m
+Filtro            : escalar
+Compilador        : 13.3.0
+Optimizaciones    : NATIVE=1 LTO=1 SOA_ALIGNED=1
+Pipeline          : full
+
+  [   0]   65536 ->   57269 pts      71.8 ms       88 MiB
+  [  10]   65536 ->   57244 pts      85.5 ms      108 MiB
+  [  20]   65536 ->   56950 pts      59.3 ms      110 MiB
+  [  30]   65536 ->   56945 pts      76.5 ms      115 MiB
+  [  40]   65536 ->   56454 pts      71.0 ms      118 MiB
+  [  50]   65536 ->   56687 pts      83.9 ms      121 MiB
+  [  60]   65536 ->   56751 pts      98.3 ms      125 MiB
+  [  70]   65536 ->   56419 pts      77.0 ms      127 MiB
+  [  80]   65536 ->   56429 pts      67.5 ms      129 MiB
+  [  90]   65536 ->   55948 pts      95.4 ms      130 MiB
+  [ 100]   65536 ->   56222 pts      90.4 ms      131 MiB
+  [ 110]   65536 ->   56157 pts      82.0 ms      132 MiB
+  [ 120]   65536 ->   55769 pts      79.7 ms      133 MiB
+  [ 130]   65536 ->   55892 pts      63.1 ms      135 MiB
+  [ 140]   65536 ->   55656 pts      61.5 ms      135 MiB
+  [ 150]   65536 ->   54967 pts      62.7 ms      137 MiB
+  [ 160]   65536 ->   54486 pts      58.6 ms      138 MiB
+  [ 170]   65536 ->   54481 pts      53.2 ms      139 MiB
+  [ 180]   65536 ->   53447 pts      43.0 ms      140 MiB
+  [ 190]   65536 ->   53183 pts      35.3 ms      141 MiB
+  [ 200]   65536 ->   53484 pts      34.6 ms      142 MiB
+  [ 210]   65536 ->   53358 pts      37.9 ms      143 MiB
+  [ 220]   65536 ->   53962 pts      38.4 ms      145 MiB
+  [ 230]   65536 ->   53697 pts      41.6 ms      148 MiB
+  [ 240]   65536 ->   53704 pts      37.5 ms      149 MiB
+  [ 250]   65536 ->   54038 pts      43.7 ms      151 MiB
+  [ 260]   65536 ->   53890 pts      40.8 ms      153 MiB
+  [ 270]   65536 ->   53544 pts      50.3 ms      154 MiB
+  [ 280]   65536 ->   53328 pts      41.8 ms      157 MiB
+  [ 290]   65536 ->   53294 pts      46.0 ms      159 MiB
+  [ 299]   65536 ->   53339 pts      61.1 ms      161 MiB
+
+Extrayendo malla (101 repeticion(es))...
+Malla: 851194 vertices, 1476683 triangulos
+Guardada en: results/opt-pc2-keilin/all/mesh.ply  (escritura 693.9 ms)
+
+Tiempo de pared por etapa (300 muestras, ms):
+  etapa          media      std      p50      p95      max
+  read            0.77     0.21     0.71     1.12     1.85
+  filter          0.16     0.10     0.12     0.43     0.55
+  convert         0.29     0.19     0.21     0.76     1.03
+  register       26.10    14.84    24.27    51.91    79.72
+  transform       0.95     0.14     0.90     1.28     1.38
+  integrate      34.32     6.70    33.79    44.09    62.19
+  TOTAL/scan     62.60    20.33    62.34    96.12   129.13
+
+Extraccion de malla (101 muestras, ms):
+  mesh          747.63    46.14   721.16   846.32   917.87
+
+Ciclo de scans: 10325.1 ms en total, 29.06 scans/s (pipeline full)
+
+Memoria: RSS final 375 MiB, pico 394 MiB
+Tiempos por scan en: results/opt-pc2-keilin/all/timings.csv
+Tiempos de malla en: results/opt-pc2-keilin/all/mesh.csv
+	Command being timed: "build-all/recon --scans data/ncd_sample/scans --out results/opt-pc2-keilin/all/mesh.ply --timing-csv results/opt-pc2-keilin/all/timings.csv --mesh-csv results/opt-pc2-keilin/all/mesh.csv --mesh-repeats 101 --pipeline full --icp-voxel 1.0"
+	User time (seconds): 125.94
+	System time (seconds): 1.21
+	Percent of CPU this job got: 146%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:26.57
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 404172
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 152569
+	Voluntary context switches: 18277
+	Involuntary context switches: 290340
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 99296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
