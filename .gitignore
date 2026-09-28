@@ -74,3 +74,9 @@ data/
 *.ply
 *.csv
 *.zip
+
+# Profiling results are versioned (one folder per machine)
+!results/**/*.csv
+# run.log tiene el RSS pico que reporta /usr/bin/time -v, y analyze_profile.py
+# lo lee de ahi. Sin esto, el pico de memoria no aparece en las tablas.
+!results/**/*.log

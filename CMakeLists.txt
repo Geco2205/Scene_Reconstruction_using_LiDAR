@@ -54,7 +54,8 @@ find_package(Eigen3 REQUIRED)
 add_library(recon_core
   src/PcdReader.cpp
   src/RangeFilter.cpp
-  src/Io.cpp)
+  src/Io.cpp
+  src/Profiler.cpp)
 
 target_include_directories(recon_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(recon_core PUBLIC Eigen3::Eigen)
