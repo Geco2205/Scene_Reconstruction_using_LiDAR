@@ -1,0 +1,85 @@
+Scans encontrados : 300  (se procesan 300)
+Voxel TSDF / ICP  : 0.1 m / 1 m
+Rango             : [1, 60] m
+Filtro            : escalar
+Compilador        : 13.3.0
+Optimizaciones    : NATIVE=0 LTO=0 SOA_ALIGNED=0
+Pipeline          : off
+
+  [   0]   65536 ->   57269 pts      87.2 ms       62 MiB
+  [  10]   65536 ->   57244 pts      83.8 ms       91 MiB
+  [  20]   65536 ->   56950 pts      66.1 ms       94 MiB
+  [  30]   65536 ->   56945 pts      72.4 ms       96 MiB
+  [  40]   65536 ->   56454 pts      69.8 ms       98 MiB
+  [  50]   65536 ->   56687 pts      83.2 ms      101 MiB
+  [  60]   65536 ->   56751 pts      82.4 ms      103 MiB
+  [  70]   65536 ->   56419 pts      73.5 ms      104 MiB
+  [  80]   65536 ->   56429 pts      74.0 ms      107 MiB
+  [  90]   65536 ->   55948 pts      89.8 ms      108 MiB
+  [ 100]   65536 ->   56222 pts      86.5 ms      109 MiB
+  [ 110]   65536 ->   56157 pts      77.3 ms      110 MiB
+  [ 120]   65536 ->   55769 pts      81.1 ms      111 MiB
+  [ 130]   65536 ->   55892 pts      64.3 ms      113 MiB
+  [ 140]   65536 ->   55656 pts      66.2 ms      113 MiB
+  [ 150]   65536 ->   54967 pts      65.7 ms      114 MiB
+  [ 160]   65536 ->   54486 pts      68.8 ms      115 MiB
+  [ 170]   65536 ->   54481 pts      61.3 ms      116 MiB
+  [ 180]   65536 ->   53447 pts      51.8 ms      117 MiB
+  [ 190]   65536 ->   53182 pts      44.0 ms      118 MiB
+  [ 200]   65536 ->   53484 pts      42.3 ms      119 MiB
+  [ 210]   65536 ->   53358 pts      45.9 ms      120 MiB
+  [ 220]   65536 ->   53962 pts      43.6 ms      122 MiB
+  [ 230]   65536 ->   53697 pts      48.7 ms      124 MiB
+  [ 240]   65536 ->   53704 pts      46.4 ms      126 MiB
+  [ 250]   65536 ->   54038 pts      52.3 ms      127 MiB
+  [ 260]   65536 ->   53890 pts      45.9 ms      129 MiB
+  [ 270]   65536 ->   53544 pts      58.0 ms      131 MiB
+  [ 280]   65536 ->   53328 pts      50.3 ms      133 MiB
+  [ 290]   65536 ->   53294 pts      54.4 ms      135 MiB
+  [ 299]   65536 ->   53339 pts      75.7 ms      137 MiB
+
+Extrayendo malla (101 repeticion(es))...
+Malla: 851194 vertices, 1476686 triangulos
+Guardada en: results/pc2-keilin/mesh.ply  (escritura 884.9 ms)
+
+Tiempo de pared por etapa (300 muestras, ms):
+  etapa          media      std      p50      p95      max
+  read            0.67     0.17     0.66     0.72     3.40
+  filter          0.26     0.04     0.25     0.27     0.85
+  convert         0.20     0.05     0.19     0.22     1.01
+  register       25.82    12.66    25.28    48.10    63.85
+  transform       1.32     0.10     1.31     1.37     2.93
+  integrate      37.31     3.94    36.15    42.06    64.57
+  TOTAL/scan     65.57    15.58    66.13    90.11   106.93
+
+Extraccion de malla (101 muestras, ms):
+  mesh         1004.98    20.61  1002.79  1046.71  1108.28
+
+Ciclo de scans: 19692.9 ms en total, 15.23 scans/s (pipeline off)
+
+Memoria: RSS final 346 MiB, pico 357 MiB
+Tiempos por scan en: results/pc2-keilin/timings.csv
+Tiempos de malla en: results/pc2-keilin/mesh.csv
+	Command being timed: "build/recon --scans data/ncd_sample/scans --out results/pc2-keilin/mesh.ply --timing-csv results/pc2-keilin/timings.csv --mesh-csv results/pc2-keilin/mesh.csv --mesh-repeats 101 --icp-voxel 1.0"
+	User time (seconds): 166.40
+	System time (seconds): 1.57
+	Percent of CPU this job got: 137%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:02.17
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 366260
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 24
+	Minor (reclaiming a frame) page faults: 459270
+	Voluntary context switches: 16248
+	Involuntary context switches: 16112
+	Swaps: 0
+	File system inputs: 8128
+	File system outputs: 99296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
